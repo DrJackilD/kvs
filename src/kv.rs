@@ -98,8 +98,7 @@ where
     pub fn set(&mut self, key: String, value: String) -> Result<()> {
         let cmd = Log::Set(key, value);
         let serialized = serde_json::to_string(&cmd)?;
-        self.storage
-            .write(format!("{}\n", String::from(serialized)))
+        self.storage.write(format!("{}\n", serialized))
     }
 
     /// Remove key-value pair from storage

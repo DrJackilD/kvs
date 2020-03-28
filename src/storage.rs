@@ -19,7 +19,7 @@ impl Storage for FileStorage {
                 if err.kind() == ErrorKind::NotFound {
                     File::create(&db_name)?
                 } else {
-                    return Err(err)?;
+                    return Err(err.into());
                 }
             }
         };
@@ -30,7 +30,7 @@ impl Storage for FileStorage {
     }
 
     fn write(&mut self, value: String) -> Result<()> {
-        self.file.write(value.as_bytes())?;
+        self.file.write_all(value.as_bytes())?;
         Ok(())
     }
 }
@@ -46,7 +46,7 @@ impl Iterator for FileStorage {
                     // Since in every get request to storage we should read entire file,
                     // we need to return cursor to the start, to enable reader re-usage
                     // in case of few get requests from one KvStore instance
-                    if let Err(_) = self.reader.seek(SeekFrom::Start(0)) {};
+                    if self.reader.seek(SeekFrom::Start(0)).is_err() {};
                     None
                 } else {
                     Some(buff.trim_end().to_owned())
