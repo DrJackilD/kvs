@@ -4,7 +4,6 @@
 use crate::storage::FileStorage;
 use failure::{format_err, Error};
 use serde::{Deserialize, Serialize};
-use serde_json;
 
 /// Custom Result type to wrap all errors,
 /// which possible during work with KvStore
@@ -12,17 +11,17 @@ pub type Result<T> = std::result::Result<T, Error>;
 
 /// Represent different database operations
 #[derive(Debug, Serialize, Deserialize)]
-enum Log {
+pub enum Log {
     Set(String, String),
     Remove(String),
 }
 
 /// Public trait, which should be implemented by all storages, which want to work as a KvStore.storage
-pub trait Storage: Iterator<Item = String> + Sized {
+pub trait Storage: Iterator<Item = Result<Log>> + Sized {
     /// Create new storage instance
-    fn new(db_name: String) -> Result<Self>;
+    fn new(db_name: &str) -> Result<Self>;
     /// Write value to a internal storage
-    fn write(&mut self, value: String) -> Result<()>;
+    fn write(&mut self, value: Log) -> Result<()>;
 }
 
 /// Represent key-value entry from storage
@@ -34,8 +33,14 @@ pub struct Entry {
 }
 
 impl Entry {
-    fn new(key: String, value: Option<String>) -> Self {
-        Self { key, value }
+    fn new(key: &str, value: Option<&str>) -> Self {
+        Self {
+            key: key.to_owned(),
+            value: match value {
+                Some(v) => Some(v.to_owned()),
+                None => None,
+            },
+        }
     }
 
     fn run(&mut self, cmd: &Log) {
@@ -65,7 +70,7 @@ impl KvStore<FileStorage> {
     /// To set up different storage use `store.storage(T)` method
     pub fn new(db: &str) -> Result<Self> {
         Ok(Self {
-            storage: FileStorage::new(String::from(db))?,
+            storage: FileStorage::new(db)?,
         })
     }
 }
@@ -75,19 +80,15 @@ where
     T: Storage,
 {
     /// Get cloned String value from storage stored with given `key`
-    pub fn get(&mut self, key: String) -> Result<Entry> {
-        let mut entry = Entry::new(key.clone(), None);
-        let cmds: Vec<Log> = self
-            .storage
-            .by_ref()
-            .filter_map(|ref line| match serde_json::from_str(line) {
-                Ok(cmd) => match &cmd {
-                    Log::Set(k, _) | Log::Remove(k) if &key == k => Some(cmd),
-                    _ => None,
-                },
-                Err(_) => None,
-            })
-            .collect();
+    pub fn get(&mut self, key: &str) -> Result<Entry> {
+        let mut entry = Entry::new(key, None);
+        let cmds = self.storage.by_ref().filter_map(|item| match item {
+            Ok(log) => match &log {
+                Log::Set(k, _) | Log::Remove(k) if k == key => Some(log),
+                _ => None,
+            },
+            _ => None,
+        });
         for cmd in cmds {
             entry.run(&cmd);
         }
@@ -95,15 +96,14 @@ where
     }
 
     /// Set `value` to storage behind given `key`
-    pub fn set(&mut self, key: String, value: String) -> Result<()> {
-        let cmd = Log::Set(key, value);
-        let serialized = serde_json::to_string(&cmd)?;
-        self.storage.write(format!("{}\n", serialized))
+    pub fn set(&mut self, key: &str, value: &str) -> Result<()> {
+        let cmd = Log::Set(key.to_owned(), value.to_owned());
+        self.storage.write(cmd)
     }
 
     /// Remove key-value pair from storage
-    pub fn remove(&mut self, key: String) -> Result<()> {
-        match self.get(key.clone()) {
+    pub fn remove(&mut self, key: &str) -> Result<()> {
+        match self.get(key) {
             Ok(ent) => {
                 if ent.value.is_none() {
                     return Err(format_err!("Key not found"));
@@ -111,9 +111,8 @@ where
             }
             Err(err) => return Err(err),
         };
-        let cmd = Log::Remove(key);
-        let serialized = serde_json::to_string(&cmd)?;
-        self.storage.write(format!("{}\n", serialized))?;
+        let cmd = Log::Remove(key.to_owned());
+        self.storage.write(cmd)?;
         Ok(())
     }
 }

@@ -73,13 +73,13 @@ fn set_cmd(db_name: &str, args: &ArgMatches) -> Result<()> {
     let mut store = KvStore::new(db_name)?;
     let key = args.value_of("KEY").unwrap();
     let value = args.value_of("VALUE").unwrap();
-    store.set(key.to_owned(), value.to_owned())
+    store.set(key, value)
 }
 
 fn get_cmd(db_name: &str, args: &ArgMatches) -> Result<()> {
     let mut store = KvStore::new(db_name)?;
     let key = args.value_of("KEY").unwrap();
-    let entry = store.get(key.to_owned());
+    let entry = store.get(key);
     let result = match entry {
         Ok(entry) => {
             if let Some(v) = entry.value {
@@ -97,5 +97,5 @@ fn get_cmd(db_name: &str, args: &ArgMatches) -> Result<()> {
 fn rm_cmd(db_name: &str, args: &ArgMatches) -> Result<()> {
     let mut store = KvStore::new(db_name)?;
     let key = args.value_of("KEY").unwrap();
-    store.remove(key.to_owned())
+    store.remove(key)
 }
