@@ -3,7 +3,7 @@
 //! with basic create-read-delete operations
 use crate::cache::InMemoryMapCache;
 use crate::storage::FileStorage;
-use failure::{format_err, Error};
+use failure::{err_msg, Error};
 use serde::{Deserialize, Serialize};
 
 /// Custom Result type to wrap all errors,
@@ -41,7 +41,9 @@ pub trait Cache: Sized {
 /// Creating by read log based storage and re-create entry's state
 #[derive(Debug, Clone)]
 pub struct Entry {
+    /// Key of this entry
     pub key: String,
+    /// Value of this entry. For convenience it can be None sometime.
     pub value: Option<String>,
 }
 
@@ -91,11 +93,7 @@ impl KvStore<FileStorage, InMemoryMapCache> {
     }
 }
 
-impl<S, C> KvStore<S, C>
-where
-    S: Storage,
-    C: Cache,
-{
+impl<S: Storage, C: Cache> KvStore<S, C> {
     /// This method set storage of KvStore to provided in storage argument.
     /// By default, method `new` create `KvStore` with `FileStorage`
     #[allow(unused)]
@@ -131,36 +129,38 @@ where
     /// Get cloned String value from storage stored with given `key`
     pub fn get(&mut self, key: &str) -> Result<Entry> {
         // We try to get entry from cache first and if only if it didn't store - re-create from logs
-        match self.cache.get_mut(key)? {
-            Some(entry) => Ok(entry.clone()),
+        let entry = match self.cache.get_mut(key)? {
+            Some(entry) => entry.clone(),
             None => {
                 let entry = self._get_from_db(&key)?;
                 self.cache.insert(entry.clone())?;
-                Ok(entry)
+                entry
             }
+        };
+        if entry.value.is_none() {
+            Err(err_msg("Key not found"))
+        } else {
+            Ok(entry)
         }
     }
 
     /// Set `value` to storage behind given `key`
     pub fn set(&mut self, key: &str, value: &str) -> Result<()> {
         let cmd = Log::Set(key.to_owned(), value.to_owned());
-        let mut entry = self.get(key)?;
-        entry.run(&cmd);
+        let entry = match self.get(key) {
+            Ok(mut ent) => {
+                ent.run(&cmd);
+                ent
+            }
+            Err(_) => Entry::new(key, Some(value)),
+        };
         self.cache.insert(entry)?;
         self.storage.write(cmd)
     }
 
     /// Remove key-value pair from storage
     pub fn remove(&mut self, key: &str) -> Result<()> {
-        let mut entry = match self.get(key) {
-            Ok(ent) => {
-                if ent.value.is_none() {
-                    return Err(format_err!("Key not found"));
-                }
-                ent
-            }
-            Err(err) => return Err(err),
-        };
+        let mut entry = self.get(key)?;
         let cmd = Log::Remove(key.to_owned());
         entry.run(&cmd);
         self.cache.insert(entry)?;

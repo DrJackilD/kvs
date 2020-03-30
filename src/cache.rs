@@ -14,13 +14,11 @@ impl Cache for InMemoryMapCache {
 
     fn insert(&mut self, entry: Entry) -> Result<()> {
         let key = entry.key.clone();
-        println!("Insert cache: {:?}", entry);
         self.cache.insert(key, entry);
         Ok(())
     }
 
     fn get(&self, key: &str) -> Result<Option<Entry>> {
-        println!("Get cache for key: {}", key);
         match self.cache.get(key) {
             Some(entry) => Ok(Some(entry.clone())),
             None => Ok(None),
@@ -28,7 +26,6 @@ impl Cache for InMemoryMapCache {
     }
 
     fn get_mut(&mut self, key: &str) -> Result<Option<&mut Entry>> {
-        println!("Get mutable reference from cache for key: {}", key);
         Ok(self.cache.get_mut(key))
     }
 }

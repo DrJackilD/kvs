@@ -1,7 +1,7 @@
 use clap::{
     crate_authors, crate_description, crate_name, crate_version, App, Arg, ArgMatches, SubCommand,
 };
-use kvs::{KvStore, Result};
+use kvs::{Entry, KvStore, Result, Shell};
 
 fn main() -> Result<()> {
     let args = App::new(crate_name!())
@@ -51,6 +51,7 @@ fn main() -> Result<()> {
                         .index(1),
                 ),
         )
+        .subcommand(SubCommand::with_name("shell").about("start KVS shell"))
         .get_matches();
     let db_name = if let Some(db) = args.value_of("db") {
         db
@@ -63,6 +64,8 @@ fn main() -> Result<()> {
         get_cmd(db_name, get_cmd_args)?;
     } else if let Some(rm_cmd_args) = args.subcommand_matches("rm") {
         rm_cmd(db_name, rm_cmd_args)?;
+    } else if let Some(shell_cmd_args) = args.subcommand_matches("shell") {
+        shell_cmd(db_name, shell_cmd_args)?;
     } else {
         panic!("unrecognized command")
     }
@@ -81,14 +84,8 @@ fn get_cmd(db_name: &str, args: &ArgMatches) -> Result<()> {
     let key = args.value_of("KEY").unwrap();
     let entry = store.get(key);
     let result = match entry {
-        Ok(entry) => {
-            if let Some(v) = entry.value {
-                v
-            } else {
-                "Key not found".to_owned()
-            }
-        }
-        Err(err) => return Err(err),
+        Ok(Entry { value: Some(v), .. }) => v,
+        _ => "Key not found".to_owned(),
     };
     println!("{}", result);
     Ok(())
@@ -98,4 +95,16 @@ fn rm_cmd(db_name: &str, args: &ArgMatches) -> Result<()> {
     let mut store = KvStore::new(db_name)?;
     let key = args.value_of("KEY").unwrap();
     store.remove(key)
+}
+
+fn shell_cmd(db_name: &str, _: &ArgMatches) -> Result<()> {
+    let store = KvStore::new(db_name)?;
+    let mut shell = Shell::create(store);
+    match shell.start() {
+        Ok(_) => Ok(()),
+        Err(err) => {
+            println!("{}", err);
+            Ok(())
+        }
+    }
 }
