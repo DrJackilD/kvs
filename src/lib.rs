@@ -1,4 +1,5 @@
 pub use kv::{KvStore, Result, Storage};
 
+mod cache;
 mod kv;
-pub mod storage;
+mod storage;
