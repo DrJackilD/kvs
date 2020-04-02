@@ -1,7 +1,7 @@
 /// This module contains Shell for KVS
 /// For this moment commands and interface is the same, as in CLI verison
 /// More features will be added later
-use crate::{Cache, Entry, KvStore, Result, Storage};
+use crate::{Cache, KvStore, Result, Storage};
 use clap::{crate_authors, crate_version, App, AppSettings, Arg, ArgMatches, SubCommand};
 use std::io::{stdin, stdout, Write};
 
@@ -61,7 +61,7 @@ impl<S: Storage, C: Cache> Shell<S, C> {
         let key = args.value_of("KEY").unwrap();
         let entry = self.db.get(key);
         let result = match entry {
-            Ok(Entry { value: Some(v), .. }) => v,
+            Ok(v) => v,
             _ => "Key not found".to_owned(),
         };
         println!("{}", result);
@@ -70,7 +70,10 @@ impl<S: Storage, C: Cache> Shell<S, C> {
 
     fn rm_cmd(&mut self, args: &ArgMatches) -> Result<()> {
         let key = args.value_of("KEY").unwrap();
-        self.db.remove(key)
+        if self.db.remove(key).is_err() {
+            println!("Key not found");
+        }
+        Ok(())
     }
 }
 

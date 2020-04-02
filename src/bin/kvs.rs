@@ -1,7 +1,7 @@
 use clap::{
     crate_authors, crate_description, crate_name, crate_version, App, Arg, ArgMatches, SubCommand,
 };
-use kvs::{Entry, KvStore, Result, Shell};
+use kvs::{KvStore, Result, Shell};
 
 fn main() -> Result<()> {
     let args = App::new(crate_name!())
@@ -82,12 +82,11 @@ fn set_cmd(db_name: &str, args: &ArgMatches) -> Result<()> {
 fn get_cmd(db_name: &str, args: &ArgMatches) -> Result<()> {
     let mut store = KvStore::new(db_name)?;
     let key = args.value_of("KEY").unwrap();
-    let entry = store.get(key);
-    let result = match entry {
-        Ok(Entry { value: Some(v), .. }) => v,
-        _ => "Key not found".to_owned(),
+    let entry = match store.get(key) {
+        Ok(v) => v,
+        Err(err) => format!("{}", err),
     };
-    println!("{}", result);
+    println!("{}", entry);
     Ok(())
 }
 

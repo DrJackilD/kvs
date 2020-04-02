@@ -11,7 +11,7 @@ use serde::{Deserialize, Serialize};
 pub type Result<T> = std::result::Result<T, Error>;
 
 /// Represent different database operations
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum Log {
     Set(String, String),
     Remove(String),
@@ -29,49 +29,12 @@ pub trait Storage: Iterator<Item = Result<Log>> + Sized {
 pub trait Cache: Sized {
     /// Create new instance
     fn new() -> Result<Self>;
-    /// Insert result to cache. Take ownership of `entry`
-    fn insert(&mut self, entry: Entry) -> Result<()>;
-    /// Get `Entry` for given key. Return owned value.
-    fn get(&self, key: &str) -> Result<Option<Entry>>;
-    /// Return mutable reference of Entry for given key
-    fn get_mut(&mut self, key: &str) -> Result<Option<&mut Entry>>;
-}
-
-/// Represent key-value entry from storage
-/// Creating by read log based storage and re-create entry's state
-#[derive(Debug, Clone)]
-pub struct Entry {
-    /// Key of this entry
-    pub key: String,
-    /// Value of this entry. For convenience it can be None sometime.
-    pub value: Option<String>,
-}
-
-impl Entry {
-    fn new(key: &str, value: Option<&str>) -> Self {
-        Self {
-            key: key.to_owned(),
-            value: match value {
-                Some(v) => Some(v.to_owned()),
-                None => None,
-            },
-        }
-    }
-
-    fn run(&mut self, cmd: &Log) {
-        match cmd {
-            Log::Set(k, v) => {
-                if &self.key == k {
-                    self.value = Some(v.clone());
-                }
-            }
-            Log::Remove(k) => {
-                if &self.key == k {
-                    self.value = None;
-                }
-            }
-        }
-    }
+    /// Insert result to cache. Take ownership of `log`
+    fn insert(&mut self, entry: Log) -> Result<()>;
+    /// Get `Log` for given key. Return owned value.
+    fn get(&self, key: &str) -> Result<Option<Log>>;
+    /// Return mutable reference of Log for given key
+    fn get_mut(&mut self, key: &str) -> Result<Option<&mut Log>>;
 }
 
 /// Key-value database
@@ -110,60 +73,55 @@ impl<S: Storage, C: Cache> KvStore<S, C> {
         self
     }
 
-    fn _get_from_db(&mut self, key: &str) -> Result<Entry> {
+    fn _get_from_db(&mut self, key: &str) -> Result<Option<Log>> {
         // Re-create entry state from logs
-        let mut entry = Entry::new(key, None);
-        let cmds = self.storage.by_ref().filter_map(|item| match item {
-            Ok(log) => match &log {
-                Log::Set(k, _) | Log::Remove(k) if k == key => Some(log),
-                _ => None,
-            },
-            _ => None,
-        });
-        for cmd in cmds {
-            entry.run(&cmd);
-        }
-        Ok(entry)
+        let log = self
+            .storage
+            .by_ref()
+            .filter_map(|item| match item {
+                Ok(log) => match &log {
+                    Log::Set(k, _) | Log::Remove(k) if k == key => Some(log),
+                    _ => None,
+                },
+                Err(_) => None,
+            })
+            .last();
+        Ok(log)
     }
 
     /// Get cloned String value from storage stored with given `key`
-    pub fn get(&mut self, key: &str) -> Result<Entry> {
-        // We try to get entry from cache first and if only if it didn't store - re-create from logs
-        let entry = match self.cache.get_mut(key)? {
-            Some(entry) => entry.clone(),
+    pub fn get(&mut self, key: &str) -> Result<String> {
+        let log = match self.cache.get_mut(key)? {
+            Some(l) => l.clone(),
             None => {
-                let entry = self._get_from_db(&key)?;
-                self.cache.insert(entry.clone())?;
-                entry
+                let log = match self._get_from_db(&key)? {
+                    Some(l) => l,
+                    None => return Err(err_msg("Key not found")),
+                };
+                self.cache.insert(log.clone())?;
+                log
             }
         };
-        if entry.value.is_none() {
-            Err(err_msg("Key not found"))
-        } else {
-            Ok(entry)
+        match log {
+            Log::Set(_, v) => Ok(v.clone()),
+            _ => Err(err_msg("Key not found")),
         }
     }
 
     /// Set `value` to storage behind given `key`
     pub fn set(&mut self, key: &str, value: &str) -> Result<()> {
         let cmd = Log::Set(key.to_owned(), value.to_owned());
-        let entry = match self.get(key) {
-            Ok(mut ent) => {
-                ent.run(&cmd);
-                ent
-            }
-            Err(_) => Entry::new(key, Some(value)),
-        };
-        self.cache.insert(entry)?;
+        self.cache.insert(cmd.clone())?;
         self.storage.write(cmd)
     }
 
     /// Remove key-value pair from storage
     pub fn remove(&mut self, key: &str) -> Result<()> {
-        let mut entry = self.get(key)?;
+        if self.get(key).is_err() {
+            return Err(err_msg("Key not found"));
+        }
         let cmd = Log::Remove(key.to_owned());
-        entry.run(&cmd);
-        self.cache.insert(entry)?;
+        self.cache.insert(cmd.clone())?;
         self.storage.write(cmd)?;
 
         Ok(())

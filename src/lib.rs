@@ -1,4 +1,4 @@
-pub use kv::{Cache, Entry, KvStore, Result, Storage};
+pub use kv::{Cache, KvStore, Result, Storage};
 pub use shell::Shell;
 
 mod cache;

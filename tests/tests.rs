@@ -141,8 +141,8 @@ fn get_stored_value() {
     store.set("key1", "value1").unwrap();
     store.set("key2", "value2").unwrap();
 
-    assert_eq!(store.get("key1").unwrap().value, Some("value1".to_owned()));
-    assert_eq!(store.get("key2").unwrap().value, Some("value2".to_owned()));
+    assert_eq!(store.get("key1").unwrap(), "value1".to_owned());
+    assert_eq!(store.get("key2").unwrap(), "value2".to_owned());
     clean_db();
 }
 
@@ -153,10 +153,10 @@ fn overwrite_value() {
     let mut store = KvStore::new(TEST_DB_NAME).unwrap();
 
     store.set("key1", "value1").unwrap();
-    assert_eq!(store.get("key1").unwrap().value, Some("value1".to_owned()));
+    assert_eq!(store.get("key1").unwrap(), "value1".to_owned());
 
     store.set("key1", "value2").unwrap();
-    assert_eq!(store.get("key1").unwrap().value, Some("value2".to_owned()));
+    assert_eq!(store.get("key1").unwrap(), "value2".to_owned());
     clean_db();
 }
 
@@ -167,7 +167,7 @@ fn get_non_existent_value() {
     let mut store = KvStore::new(TEST_DB_NAME).unwrap();
 
     store.set("key1", "value1").unwrap();
-    assert_eq!(store.get("key2").unwrap().value, None);
+    assert!(store.get("key2").is_err());
     clean_db();
 }
 
@@ -178,6 +178,6 @@ fn remove_key() {
 
     store.set("key1", "value1").unwrap();
     store.remove("key1").unwrap();
-    assert_eq!(store.get("key1").unwrap().value, None);
+    assert!(store.get("key1").is_err());
     clean_db();
 }
