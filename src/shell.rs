@@ -1,19 +1,19 @@
 /// This module contains Shell for KVS
 /// For this moment commands and interface is the same, as in CLI verison
 /// More features will be added later
-use crate::{Cache, KvStore, Result, Storage};
+use crate::{KvStore, Result};
 use clap::{crate_authors, crate_version, App, AppSettings, Arg, ArgMatches, SubCommand};
 use std::io::{stdin, stdout, Write};
 
 const SHELL_NEW_LINE: &str = ">>> ";
 
 /// This is main shell instance, which constantly read user's input until get Ctrl + C or quit command
-pub struct Shell<S, C> {
-    db: KvStore<S, C>,
+pub struct Shell {
+    db: KvStore,
 }
 
-impl<S: Storage, C: Cache> Shell<S, C> {
-    pub fn create(db: KvStore<S, C>) -> Self {
+impl Shell {
+    pub fn create(db: KvStore) -> Self {
         Shell { db }
     }
 

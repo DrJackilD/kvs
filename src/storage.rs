@@ -1,6 +1,6 @@
 use crate::kv::{Log, Result, Storage};
 use serde_json;
-use std::fs::{File, OpenOptions};
+use std::fs::{remove_file, rename, File, OpenOptions};
 use std::io::prelude::*;
 use std::io::{BufReader, ErrorKind, SeekFrom};
 
@@ -8,6 +8,7 @@ use std::io::{BufReader, ErrorKind, SeekFrom};
 /// Each storage represent single file in the filesystem,
 /// containing commands, located each on the new line
 pub struct FileStorage {
+    path: String,
     file: File,
     reader: BufReader<File>,
 }
@@ -25,21 +26,38 @@ impl Storage for FileStorage {
             }
         };
         Ok(Self {
+            path: db_name.to_owned(),
             file: f,
             reader: BufReader::new(File::open(db_name)?),
         })
     }
 
-    fn write(&mut self, value: Log) -> Result<()> {
+    fn write(&mut self, value: Log) -> Result<usize> {
         let serialized = serde_json::to_string(&value)?;
         self.file
             .write_all(format!("{}\n", serialized).as_bytes())?;
+        Ok(serialized.len())
+    }
+
+    fn override_storage(&mut self, values: Vec<&Log>) -> Result<()> {
+        let new_file_name = format!("{}.kvsoverride", &self.path);
+        // rename(self.path, old_file_name)?;
+        let f = File::create(&new_file_name)?;
+        self.file = f;
+        self.reader = BufReader::new(File::open(&self.path)?);
+        let old_file_name = format!("{}.kvsold", &self.path);
+        rename(&self.path, &old_file_name)?;
+        for log in values {
+            self.write(log.clone())?;
+        }
+        rename(new_file_name, &self.path)?;
+        remove_file(&old_file_name)?;
         Ok(())
     }
 }
 
 impl Iterator for FileStorage {
-    type Item = Result<Log>;
+    type Item = Result<(Log, usize)>;
 
     fn next(&mut self) -> Option<Self::Item> {
         let mut buff = String::new();
@@ -53,7 +71,7 @@ impl Iterator for FileStorage {
                     None
                 } else {
                     match serde_json::from_str(&buff) {
-                        Ok(item) => Some(Ok(item)),
+                        Ok(item) => Some(Ok((item, size))),
                         Err(_) => None,
                     }
                 }
