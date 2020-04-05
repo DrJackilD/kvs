@@ -25,7 +25,7 @@ pub trait Storage: Iterator<Item = Result<(Log, usize)>> + Sized {
     /// Create new storage instance
     fn new(db_name: &str) -> Result<Self>;
     /// Write value to a internal storage. Return result with amount of bytes writed
-    fn write(&mut self, value: Log) -> Result<usize>;
+    fn write(&mut self, value: &Log) -> Result<usize>;
     /// Override WAL file by values in Vec<&Log>
     fn override_storage(&mut self, values: Vec<&Log>) -> Result<()>;
 }
@@ -105,27 +105,33 @@ impl KvStore {
 
     /// Get cloned String value from storage stored with given `key`
     pub fn get(&mut self, key: &str) -> Result<String> {
-        let log = match self.cache.get_mut(key)? {
-            Some(l) => l.clone(),
+        match self.cache.get_mut(key)? {
+            Some(Log::Set(_, value)) => Ok(value.clone()),
+            Some(Log::Remove(_)) => Err(err_msg("Key not found")),
             None => {
-                let (log, size) = match self._get_from_db(&key)? {
-                    Some(l) => l,
-                    None => return Err(err_msg("Key not found")),
+                let value = match self._get_from_db(&key)? {
+                    Some((log, size)) => match &log {
+                        Log::Set(_, value) => {
+                            let v = value.clone();
+                            self.cache.insert(log, size)?;
+                            Some(v)
+                        }
+                        _ => None,
+                    },
+                    _ => None,
                 };
-                self.cache.insert(log.clone(), size)?;
-                log
+                match value {
+                    Some(v) => Ok(v),
+                    None => Err(err_msg("Key not found")),
+                }
             }
-        };
-        match log {
-            Log::Set(_, v) => Ok(v.clone()),
-            _ => Err(err_msg("Key not found")),
         }
     }
 
     /// Set `value` to storage behind given `key`
     pub fn set(&mut self, key: &str, value: &str) -> Result<()> {
         let log = Log::Set(key.to_owned(), value.to_owned());
-        let size = self.storage.write(log.clone())?;
+        let size = self.storage.write(&log)?;
         self.cache.insert(log, size)?;
         if self.cache.uncompacted_space() >= UNCOMPACTED_THREESHOLD {
             self.compress_storage()?
@@ -139,7 +145,7 @@ impl KvStore {
             return Err(err_msg("Key not found"));
         }
         let log = Log::Remove(key.to_owned());
-        let size = self.storage.write(log.clone())?;
+        let size = self.storage.write(&log)?;
         self.cache.insert(log, size)?;
         Ok(())
     }

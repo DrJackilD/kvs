@@ -32,8 +32,8 @@ impl Storage for FileStorage {
         })
     }
 
-    fn write(&mut self, value: Log) -> Result<usize> {
-        let serialized = serde_json::to_string(&value)?;
+    fn write(&mut self, value: &Log) -> Result<usize> {
+        let serialized = serde_json::to_string(value)?;
         self.file
             .write_all(format!("{}\n", serialized).as_bytes())?;
         Ok(serialized.len())
@@ -48,7 +48,7 @@ impl Storage for FileStorage {
         let old_file_name = format!("{}.kvsold", &self.path);
         rename(&self.path, &old_file_name)?;
         for log in values {
-            self.write(log.clone())?;
+            self.write(log)?;
         }
         rename(new_file_name, &self.path)?;
         remove_file(&old_file_name)?;
