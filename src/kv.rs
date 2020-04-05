@@ -2,15 +2,11 @@
 //! This crate defines simple key-value storage
 //! with basic create-read-delete operations
 use crate::cache::InMemoryMapCache;
+use crate::error::{KvsError, Result};
 use crate::storage::FileStorage;
-use failure::{err_msg, Error};
 use serde::{Deserialize, Serialize};
 
 const UNCOMPACTED_THREESHOLD: usize = 1024 * 1024;
-
-/// Custom Result type to wrap all errors,
-/// which possible during work with KvStore
-pub type Result<T> = std::result::Result<T, Error>;
 
 /// Represent different database operations
 /// last argument in all entries is a length of log
@@ -107,7 +103,7 @@ impl KvStore {
     pub fn get(&mut self, key: &str) -> Result<String> {
         match self.cache.get_mut(key)? {
             Some(Log::Set(_, value)) => Ok(value.clone()),
-            Some(Log::Remove(_)) => Err(err_msg("Key not found")),
+            Some(Log::Remove(_)) => Err(KvsError::KeyNotFound),
             None => {
                 let value = match self._get_from_db(&key)? {
                     Some((log, size)) => match &log {
@@ -122,7 +118,7 @@ impl KvStore {
                 };
                 match value {
                     Some(v) => Ok(v),
-                    None => Err(err_msg("Key not found")),
+                    None => Err(KvsError::KeyNotFound),
                 }
             }
         }
@@ -142,7 +138,7 @@ impl KvStore {
     /// Remove key-value pair from storage
     pub fn remove(&mut self, key: &str) -> Result<()> {
         if self.get(key).is_err() {
-            return Err(err_msg("Key not found"));
+            return Err(KvsError::KeyNotFound);
         }
         let log = Log::Remove(key.to_owned());
         let size = self.storage.write(&log)?;

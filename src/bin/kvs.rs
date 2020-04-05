@@ -1,7 +1,8 @@
 use clap::{
     crate_authors, crate_description, crate_name, crate_version, App, Arg, ArgMatches, SubCommand,
 };
-use kvs::{KvStore, Result, Shell};
+use kvs::{KvStore, KvsError, Result, Shell};
+use std::process::exit;
 
 fn main() -> Result<()> {
     let args = App::new(crate_name!())
@@ -89,7 +90,14 @@ fn get_cmd(db_name: &str, args: &ArgMatches) -> Result<()> {
 fn rm_cmd(db_name: &str, args: &ArgMatches) -> Result<()> {
     let mut store = KvStore::new(db_name)?;
     let key = args.value_of("KEY").unwrap();
-    store.remove(key)
+    match store.remove(key) {
+        Ok(_) => Ok(()),
+        Err(KvsError::KeyNotFound) => {
+            eprintln!("Key not found");
+            exit(1)
+        }
+        Err(err) => return Err(err),
+    }
 }
 
 fn shell_cmd(db_name: &str, _: &ArgMatches) -> Result<()> {

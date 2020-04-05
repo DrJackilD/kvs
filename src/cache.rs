@@ -1,4 +1,5 @@
-use crate::kv::{Cache, Log, Result};
+use crate::kv::Log;
+use crate::{Cache, Result};
 use std::collections::HashMap;
 
 pub struct InMemoryMapCache {
@@ -32,7 +33,7 @@ impl Cache for InMemoryMapCache {
                 if let Some(l) = self.cache.remove(k) {
                     self.uncompacted += l.size;
                 }
-            },
+            }
             Log::Set(k, _) => {
                 let old = self.cache.insert(k.clone(), SizedLog::new(log, size));
                 if let Some(item) = old {
@@ -53,7 +54,7 @@ impl Cache for InMemoryMapCache {
     fn get_mut(&mut self, key: &str) -> Result<Option<&mut Log>> {
         match self.cache.get_mut(key) {
             Some(sized_log) => Ok(Some(&mut sized_log.log)),
-            None => Ok(None)
+            None => Ok(None),
         }
     }
 

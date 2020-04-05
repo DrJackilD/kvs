@@ -28,22 +28,20 @@ impl Shell {
             let args: Vec<&str> = input.trim().split_whitespace().collect();
             let res_args = app.get_matches_from_safe_borrow(args);
             match res_args {
-                Ok(args) => {
-                    match args.subcommand() {
-                        ("set", Some(matches)) => self.set_cmd(matches)?,
-                        ("get", Some(matches)) => self.get_cmd(matches)?,
-                        ("rm", Some(matches)) => self.rm_cmd(matches)?,
-                        ("help", _) => {
-                            app.print_long_help()?;
-                            println!();
-                        }
-                        ("exit", _) => {
-                            println!("Bye!");
-                            break;
-                        },
-                        _ => println!("error: invalid command"),
+                Ok(args) => match args.subcommand() {
+                    ("set", Some(matches)) => self.set_cmd(matches)?,
+                    ("get", Some(matches)) => self.get_cmd(matches)?,
+                    ("rm", Some(matches)) => self.rm_cmd(matches)?,
+                    ("help", _) => {
+                        app.print_long_help()?;
+                        println!();
                     }
-                }
+                    ("exit", _) => {
+                        println!("Bye!");
+                        break;
+                    }
+                    _ => println!("error: invalid command"),
+                },
                 Err(err) => println!("{}", err),
             }
         }

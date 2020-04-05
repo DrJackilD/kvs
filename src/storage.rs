@@ -1,4 +1,5 @@
-use crate::kv::{Log, Result, Storage};
+use crate::error::Result;
+use crate::kv::{Log, Storage};
 use serde_json;
 use std::fs::{remove_file, rename, File, OpenOptions};
 use std::io::prelude::*;
