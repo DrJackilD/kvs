@@ -29,20 +29,19 @@ impl Shell {
             let res_args = app.get_matches_from_safe_borrow(args);
             match res_args {
                 Ok(args) => {
-                    if let Some(set_cmd_args) = args.subcommand_matches("set") {
-                        self.set_cmd(set_cmd_args)?;
-                    } else if let Some(get_cmd_args) = args.subcommand_matches("get") {
-                        self.get_cmd(get_cmd_args)?;
-                    } else if let Some(_rm_cmd_args) = args.subcommand_matches("rm") {
-                        self.rm_cmd(_rm_cmd_args)?;
-                    } else if args.subcommand_matches("help").is_some() {
-                        app.print_long_help()?;
-                        println!();
-                    } else if args.subcommand_matches("exit").is_some() {
-                        println!("Bye!");
-                        break;
-                    } else {
-                        println!("Error: invalid argument");
+                    match args.subcommand() {
+                        ("set", Some(matches)) => self.set_cmd(matches)?,
+                        ("get", Some(matches)) => self.get_cmd(matches)?,
+                        ("rm", Some(matches)) => self.rm_cmd(matches)?,
+                        ("help", _) => {
+                            app.print_long_help()?;
+                            println!();
+                        }
+                        ("exit", _) => {
+                            println!("Bye!");
+                            break;
+                        },
+                        _ => println!("error: invalid command"),
                     }
                 }
                 Err(err) => println!("{}", err),
