@@ -58,16 +58,12 @@ fn main() -> Result<()> {
     } else {
         "kvs.db"
     };
-    if let Some(set_cmd_args) = args.subcommand_matches("set") {
-        set_cmd(db_name, set_cmd_args)?;
-    } else if let Some(get_cmd_args) = args.subcommand_matches("get") {
-        get_cmd(db_name, get_cmd_args)?;
-    } else if let Some(rm_cmd_args) = args.subcommand_matches("rm") {
-        rm_cmd(db_name, rm_cmd_args)?;
-    } else if let Some(shell_cmd_args) = args.subcommand_matches("shell") {
-        shell_cmd(db_name, shell_cmd_args)?;
-    } else {
-        panic!("unrecognized command")
+    match args.subcommand() {
+        ("set", Some(matches)) => set_cmd(db_name, matches)?,
+        ("get", Some(matches)) => get_cmd(db_name, matches)?,
+        ("rm", Some(matches)) => rm_cmd(db_name, matches)?,
+        ("shell", Some(matches)) => shell_cmd(db_name, matches)?,
+        _ => unreachable!(),
     }
     Ok(())
 }
