@@ -22,14 +22,16 @@ OPTIONS:
     -d, --db <db>    path to database file [default: kvs.db]
 
 SUBCOMMANDS:
-    get     get key from storage
-    help    Prints this message or the help of the given subcommand(s)
-    rm      remove key-value pair from storage
-    set     set key with given value
+    get      get key from storage
+    help     Prints this message or the help of the given subcommand(s)
+    rm       remove key-value pair from storage
+    set      set key with given value
+    shell    start KVS shell
 ```
 
 ## Example
 
+### Command-line client
 ```
 $ kvs set a 3
 $ kvs set b 5
@@ -40,4 +42,16 @@ $ kvs get a
 55
 $ kvs get c
 Key not found
+```
+
+### Shell
+```
+$ kvs shell
+>>> get a
+55
+>>> set c 25
+>>> get c
+25
+>>> exit
+Bye!
 ```
